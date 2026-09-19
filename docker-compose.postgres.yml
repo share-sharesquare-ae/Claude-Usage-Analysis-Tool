@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: claude-usage-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-claude_usage}
+      POSTGRES_USER: ${POSTGRES_USER:-claude_usage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - claude_usage_postgres:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  claude_usage_postgres:

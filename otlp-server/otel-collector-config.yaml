@@ -1,0 +1,79 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  bearertokenauth/ingest:
+    token: ${env:OTLP_TOKEN}
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/ingest
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  resource/common:
+    attributes:
+      - key: collector.name
+        value: claude-enterprise-collector
+        action: upsert
+      - key: collector.environment
+        value: local
+        action: upsert
+  attributes/privacy:
+    actions:
+      - {key: response, action: delete}
+      - {key: assistant_response, action: delete}
+      - {key: tool_input, action: delete}
+      - {key: tool_parameters, action: delete}
+      - {key: tool.content, action: delete}
+      - {key: body, action: delete}
+      - {key: full_command, action: delete}
+      - {key: file_path, action: delete}
+  batch:
+    timeout: 2s
+    send_batch_size: 256
+    send_batch_max_size: 512
+
+exporters:
+  debug:
+    verbosity: basic
+  otlphttp/backend:
+    endpoint: http://host.docker.internal:8000
+    encoding: json
+    compression: none
+    headers:
+      Authorization: Bearer ${env:BACKEND_INGEST_TOKEN}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      queue_size: 10000
+      num_consumers: 4
+
+service:
+  telemetry:
+    logs:
+      level: info
+  extensions: [health_check, bearertokenauth/ingest]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/common, attributes/privacy, batch]
+      exporters: [debug, otlphttp/backend]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/common, batch]
+      exporters: [debug, otlphttp/backend]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/common, attributes/privacy, batch]
+      exporters: [debug, otlphttp/backend]

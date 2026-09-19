@@ -1,0 +1,16 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.157.0
+    container_name: claude-otel-collector
+    command:
+      - --config=/etc/otelcol-contrib/config.yaml
+    environment:
+      OTLP_TOKEN: ${OTLP_TOKEN:?OTLP_TOKEN must be configured in .env}
+      BACKEND_INGEST_TOKEN: ${BACKEND_INGEST_TOKEN:?BACKEND_INGEST_TOKEN must be set}
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      # - ./data:/data:rw
+    ports:
+      - "${OTLP_BIND_HOST:-127.0.0.1}:${OTLP_HTTP_PORT:-4318}:4318"
+      - "${OTLP_BIND_HOST:-127.0.0.1}:${OTEL_HEALTH_PORT:-13134}:13133"
+    restart: unless-stopped
