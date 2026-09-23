@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fastapi_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - BACKEND_STATE_DIR=/app/data
+      - POLL_INTERVAL_SECONDS=0.5
+      - HISTORY_LIMIT=10000
+      - WS_HEARTBEAT_SECONDS=20
+      - OTLP_RAW_DIR=/otlp-data
+      - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+      - DATABASE_URL=postgresql://claudeusage:2r%26t%5DHhO2%280%2B@claude-usage-analysis-db.postgres.database.azure.com:5432/claude_usage?sslmode=require
+      - BACKEND_INGEST_TOKEN=43a0523c29e5737eff950350e601088ba1f7cc8420525ae9e2673fe353d65a1f
+      - DATABASE_POOL_MIN_SIZE=1
+      - DATABASE_POOL_MAX_SIZE=10
+      - DASHBOARD_ADMIN_TOKEN=b7a18ff5ddc805382c331b0dbb657ac649d1ff5d979573c003f4bca18d514065
+      - ORGANIZATION_EMAIL_DOMAIN=resolutecorp.in
+      - AUTH_COOKIE_NAME=claude_usage_session
+      - AUTH_SESSION_HOURS=8
+      - AUTH_COOKIE_SECURE=true
+    volumes:
+      - backend-data:/app/data
+      - otlp-data:/otlp-data
+    networks:
+      - app-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.157.0
+    container_name: otel_collector
+    restart: always
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - otlp-data:/otlp-data
+    networks:
+      - app-net
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok_tunnel
+    restart: always
+    command:
+      - "http"
+      - "backend:8000"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    networks:
+      - app-net
+
+volumes:
+  backend-data:
+  otlp-data:
+
+networks:
+  app-net:
+    driver: bridge
