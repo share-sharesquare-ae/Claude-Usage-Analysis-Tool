@@ -33,7 +33,7 @@ jobs:
           password: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
           port: 22
           source: "."
-          target: "C:\inetpub\wwwroot\claude-app-dev"
+          target: "C:\\inetpub\\wwwroot\\claude-app-dev"
 
       - name: Execute Docker Compose Deployment via SSH
         uses: appleboy/ssh-action@master
