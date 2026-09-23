@@ -25,41 +25,24 @@ jobs:
           npm install
           npm run build
 
-      - name: Copy Files and Deploy via PowerShell
-        shell: pwsh
-        env:
-          SERVER_IP: ${{ secrets.WINDOWS_SERVER_IP }}
-          SERVER_USER: ${{ secrets.WINDOWS_SERVER_USER }}
-          SERVER_PASS: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
-        run: |
-          # Create a secure credential object
-          $secPass = ConvertTo-SecureString $env:SERVER_PASS -AsPlainText -Force
-          $cred = New-Object System.Management.Automation.PSCredential($env:SERVER_USER, $secPass)
+      - name: Copy Files to Windows Server via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.WINDOWS_SERVER_IP }}
+          username: ${{ secrets.WINDOWS_SERVER_USER }}
+          password: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
+          port: 22
+          source: "."
+          target: "C:\inetpub\wwwroot\claude-app-dev"
 
-          # Create PSSession to the remote Windows Server
-          Write-Host "Connecting to remote Windows Server..."
-          $session = New-PSSession -ComputerName $env:SERVER_IP -Credential $cred -Authentication Negotiate
-
-          try {
-              Write-Host "Ensuring destination directory exists..."
-              Invoke-Command -Session $session -ScriptBlock {
-                  if (!(Test-Path "C:\inetpub\wwwroot\claude-app-dev")) {
-                      New-Item -ItemType Directory -Force -Path "C:\inetpub\wwwroot\claude-app-dev"
-                  }
-              }
-
-              Write-Host "Copying project files to remote server..."
-              # Copy files from runner to remote server path (excluding git/unnecessary folders if desired)
-              Copy-Item -ToSession $session -Path "$PWD\*" -Destination "C:\inetpub\wwwroot\claude-app-dev" -Recurse -Force
-
-              Write-Host "Executing Docker Compose deployment..."
-              Invoke-Command -Session $session -ScriptBlock {
-                  Set-Location "C:\inetpub\wwwroot\claude-app-dev"
-                  docker compose down
-                  docker compose up -d --build
-              }
-              Write-Host "Deployment completed successfully!"
-          }
-          finally {
-              Remove-PSSession $session
-          }
+      - name: Execute Docker Compose Deployment via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.WINDOWS_SERVER_IP }}
+          username: ${{ secrets.WINDOWS_SERVER_USER }}
+          password: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
+          port: 22
+          script: |
+            cd C:\inetpub\wwwroot\claude-app-dev
+            docker compose down
+            docker compose up -d --build
