@@ -1,0 +1,44 @@
+name: Deploy to Windows Server (Dev)
+
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build React Frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Copy Files to Windows Server IIS & Project Directory
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.WINDOWS_SERVER_IP }}
+          username: ${{ secrets.WINDOWS_SERVER_USER }}
+          password: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
+          source: "."
+          target: "C:\\inetpub\\wwwroot\\claude-app-dev"
+
+      - name: Deploy Docker Compose Services on Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.WINDOWS_SERVER_IP }}
+          username: ${{ secrets.WINDOWS_SERVER_USER }}
+          password: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
+          script: |
+            cd C:\inetpub\wwwroot\claude-app-dev
+            docker compose down
+            docker compose up -d --build
