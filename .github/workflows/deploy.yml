@@ -25,36 +25,7 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy to Windows Server via Native SSH/SCP
-        shell: pwsh
-        env:
-          SERVER_IP: ${{ secrets.WINDOWS_SERVER_IP }}
-          SERVER_USER: ${{ secrets.WINDOWS_SERVER_USER }}
-          SERVER_PASS: ${{ secrets.WINDOWS_SERVER_PASSWORD }}
-        run: |
-          # 1. Setup sshpass equivalent or automated password handling for Windows scp/ssh
-          # We can use .NET credentials or script remote execution
-          $securePass = ConvertTo-SecureString $env:SERVER_PASS -AsPlainText -Force
-          $credential = New-Object System.Management.Automation.PSCredential($env:SERVER_USER, $securePass)
-
-          Write-Host "Connecting to Windows Server to prepare directory..."
-          $sshCommand = "if (!(Test-Path 'C:\inetpub\wwwroot\claude-app-dev')) { New-Item -ItemType Directory -Force -Path 'C:\inetpub\wwwroot\claude-app-dev' }"
-          
-          # Execute directory creation via SSH
-          echo $env:SERVER_PASS | ssh -o StrictHostKeyChecking=no "${env:SERVER_USER}@${env:SERVER_IP}" "$sshCommand"
-
-          Write-Host "Transferring project files..."
-          # Use scp to copy files recursively. (Note: standard Windows OpenSSH scp prompts for password, 
-          # but we can pass it or use sftp / tar streaming).
-          
-          # Alternative ultra-reliable method: Create a tarball and extract it over SSH
-          tar -a -cf deploy.zip *
-          
-          Write-Host "Uploading deployment package..."
-          # Copy zip via scp using ssh client config or automated pipe if supported, 
-          # or let's use an even simpler direct execution method:
-          
-      - name: Execute Docker Compose via SSH Action
+      - name: Sync Code and Restart via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.WINDOWS_SERVER_IP }}
@@ -63,5 +34,6 @@ jobs:
           port: 22
           script: |
             cd C:\inetpub\wwwroot\claude-app-dev
+            git pull origin dev
             docker compose down
             docker compose up -d --build
